@@ -1,4 +1,59 @@
 from crewai import Agent
+from .groq_adapter import GroqCrewAIAdapter
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+llm = GroqCrewAIAdapter(
+    model="llama-3.3-70b-versatile",
+    temperature=0.7
+)
+
+class BlogAgents:
+    def researcher(self):
+        return Agent(
+            role="Research Specialist",
+            goal="Find comprehensive, accurate information",
+            backstory="Expert researcher with 15+ years experience",
+            llm=llm,
+            verbose=True,
+            allow_delegation=False,
+            max_iter=3
+        )
+
+    def writer(self):
+        return Agent(
+            role="Content Writer",
+            goal="Transform research into engaging blog content",
+            backstory="Professional blog writer known for compelling content",
+            llm=llm,
+            verbose=True,
+            allow_delegation=False,
+            max_iter=3
+        )
+
+    def editor(self):
+        return Agent(
+            role="Senior Editor",
+            goal="Polish and refine blog post for quality",
+            backstory="Senior editor with impeccable attention to detail",
+            llm=llm,
+            verbose=True,
+            allow_delegation=True,
+            max_iter=3
+        )
+
+    def seo_analyst(self):
+        return Agent(
+            role="SEO Specialist",
+            goal="Optimize content for search engines",
+            backstory="SEO expert balancing keywords with readability",
+            llm=llm,
+            verbose=True,
+            allow_delegation=False,
+            max_iter=3
+        )from crewai import Agent
 from .gemini_adapter import GeminiCrewAIAdapter
 import os
 from dotenv import load_dotenv
