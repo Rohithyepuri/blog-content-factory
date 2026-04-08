@@ -1,25 +1,11 @@
 import streamlit as st
 import os
-import sys
-
-# Better import handling with error messages
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    st.warning("python-dotenv not found, using environment variables directly")
-
-try:
-    from google import genai
-    from google.genai import types
-except ImportError:
-    st.error("google-genai not installed. Please check requirements.txt")
-    st.stop()
-
 import time
 from datetime import datetime
-import plotly.graph_objects as go
-import pandas as pd
+from dotenv import load_dotenv
+from groq import Groq
+
+load_dotenv()
 
 st.set_page_config(
     page_title="Blog Factory | AI Content Generation",
@@ -35,7 +21,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="main-header"><h1>🤖 Automated Blog Content Factory</h1><p>4 Specialized AI Agents | 45-60 Second Generation | SEO Optimized</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>🤖 Automated Blog Content Factory</h1><p>4 Specialized AI Agents | Powered by Groq (Free & Fast!) | SEO Optimized</p></div>', unsafe_allow_html=True)
 
 # Display agents
 col1, col2, col3, col4 = st.columns(4)
@@ -48,40 +34,34 @@ for col, (emoji, name, desc) in zip([col1, col2, col3, col4], agents):
 topic = st.text_input("📝 Blog Topic", placeholder="e.g., The Future of Artificial Intelligence")
 col1, col2 = st.columns(2)
 with col1:
-    word_count = st.select_slider("Target Length", options=[500, 1000, 1500, 2000], value=1500)
+    word_count = st.select_slider("Target Length", options=[500, 800, 1000, 1200, 1500], value=800)
 with col2:
     creativity = st.slider("Creativity Level", 0.0, 1.0, 0.7)
 
-# Get API key from secrets (Streamlit Cloud) or .env (local)
-api_key = None
-
-# Try different methods to get API key
-try:
-    api_key = st.secrets.get("GEMINI_API_KEY")
-except:
-    pass
-
+# Groq API key
+api_key = os.getenv("GROQ_API_KEY")
 if not api_key:
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = st.text_input("🔑 Groq API Key", type="password", 
+                            help="Get free from console.groq.com")
+    if not api_key:
+        st.info("Please enter your Groq API key or add GROQ_API_KEY to .env file")
+        st.stop()
 
-if not api_key:
-    st.error("❌ GEMINI_API_KEY not found! Please add it to Streamlit Secrets or .env file")
-    st.info("""
-    **For Streamlit Cloud:**
-    1. Go to your app dashboard
-    2. Click Settings → Secrets
-    3. Add: `GEMINI_API_KEY = "your_key_here"`
-    
-    **For Local:**
-    Create a `.env` file with: `GEMINI_API_KEY=your_key_here`
-    """)
-    st.stop()
+client = Groq(api_key=api_key)
 
-try:
-    client = genai.Client(api_key=api_key)
-except Exception as e:
-    st.error(f"Failed to initialize Gemini client: {e}")
-    st.stop()
+def call_groq(prompt):
+    """Call Groq API with retry logic"""
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",  # Free, high quality, fast
+            messages=[{"role": "user", "content": prompt}],
+            temperature=creativity,
+            max_tokens=2000
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
+        return None
 
 if st.button("🚀 Generate Blog Post", type="primary", use_container_width=True):
     if not topic:
@@ -94,60 +74,70 @@ if st.button("🚀 Generate Blog Post", type="primary", use_container_width=True
         try:
             status.markdown("🔍 **Agent 1/4: Researching...**")
             progress.progress(25)
-            r = client.models.generate_content(
-                model="gemini-2.5-flash", 
-                contents=f"Research topic: {topic}. Provide key facts, statistics, and trends.",
-                config=types.GenerateContentConfig(temperature=creativity)
-            )
-            research = r.text
+            research = call_groq(f"Research the topic: '{topic}'. Provide 3 key facts and trends in 2-3 sentences.")
             
-            status.markdown("✍️ **Agent 2/4: Writing...**")
-            progress.progress(50)
-            w = client.models.generate_content(
-                model="gemini-2.5-flash", 
-                contents=f"Using this research: {research}\nWrite a {word_count}-word blog post about '{topic}'. Include headline, introduction, body with subheadings, and conclusion.",
-                config=types.GenerateContentConfig(temperature=creativity)
-            )
-            draft = w.text
-            
-            status.markdown("📝 **Agent 3/4: Editing...**")
-            progress.progress(75)
-            e = client.models.generate_content(
-                model="gemini-2.5-flash", 
-                contents=f"Edit this blog post for grammar, flow, and tone: {draft}",
-                config=types.GenerateContentConfig(temperature=creativity)
-            )
-            edited = e.text
-            
-            status.markdown("🎯 **Agent 4/4: SEO Optimization...**")
-            progress.progress(100)
-            s = client.models.generate_content(
-                model="gemini-2.5-flash", 
-                contents=f"Add SEO optimization (keywords, meta description, URL suggestions) to this blog post: {edited}",
-                config=types.GenerateContentConfig(temperature=creativity)
-            )
-            final = s.text
-            
-            st.markdown("---")
-            st.subheader("📄 Generated Blog Post")
-            st.markdown(final)
-            
-            # Save option
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            st.download_button(
-                label="📥 Download Blog Post",
-                data=final,
-                file_name=f"blog_{topic.replace(' ', '_')}_{timestamp}.txt",
-                mime="text/plain"
-            )
-            
-            st.success(f"✅ Blog generated in {time.time()-start:.1f} seconds!")
+            if research:
+                status.markdown("✍️ **Agent 2/4: Writing...**")
+                progress.progress(50)
+                draft = call_groq(f"Using this research: {research}\nWrite a {word_count}-word blog post about '{topic}'. Include an engaging headline, introduction, 3-4 body paragraphs with subheadings, and a conclusion.")
+                
+                if draft:
+                    status.markdown("📝 **Agent 3/4: Editing...**")
+                    progress.progress(75)
+                    edited = call_groq(f"Edit this blog post for grammar, flow, and tone: {draft}. Fix any errors and improve readability.")
+                    
+                    if edited:
+                        status.markdown("🎯 **Agent 4/4: SEO Optimization...**")
+                        progress.progress(100)
+                        final = call_groq(f"Add SEO optimization to this blog post: {edited}. Include primary keyword, secondary keywords, meta description (under 160 chars), and URL suggestion at the top.")
+                        
+                        if final:
+                            st.markdown("---")
+                            st.subheader("📄 Generated Blog Post")
+                            st.markdown(final)
+                            
+                            # Save to file
+                            os.makedirs("output", exist_ok=True)
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            filename = f"output/blog_{topic.replace(' ', '_')}_{timestamp}.txt"
+                            with open(filename, 'w', encoding='utf-8') as f:
+                                f.write(final)
+                            
+                            # Download button
+                            with open(filename, 'r', encoding='utf-8') as f:
+                                st.download_button(
+                                    label="📥 Download Blog Post",
+                                    data=f.read(),
+                                    file_name=f"blog_{topic.replace(' ', '_')}_{timestamp}.txt",
+                                    mime="text/plain"
+                                )
+                            
+                            st.success(f"✅ Blog generated in {time.time()-start:.1f} seconds! (Free Groq API)")
             
         except Exception as e:
-            st.error(f"Error during generation: {str(e)}")
+            st.error(f"Error: {str(e)}")
         finally:
             progress.empty()
             status.empty()
 
-st.markdown("---")
-st.markdown("Built with ❤️ using Google Gemini AI | 4 Specialized Agents")
+# Sidebar with info
+st.sidebar.markdown("---")
+st.sidebar.subheader("⚡ Groq Free Tier")
+st.sidebar.info("""
+- **30 requests/minute**
+- **1000+ requests/day**
+- **Extremely fast** (500+ tokens/sec)
+- **100% free** (no credit card)
+""")
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("🎯 4 AI Agents")
+st.sidebar.markdown("""
+1. 🔍 **Researcher** - Gathers facts & trends
+2. ✍️ **Writer** - Creates engaging content
+3. 📝 **Editor** - Polishes grammar & flow
+4. 🎯 **SEO Analyst** - Optimizes for search
+""")
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("Built with ❤️ using **Groq** | 4 Specialized Agents")
