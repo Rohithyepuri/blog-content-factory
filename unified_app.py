@@ -17,7 +17,8 @@ st.markdown("""
 <style>
     .stApp { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
     .main-header { text-align: center; padding: 2rem; background: rgba(255,255,255,0.95); border-radius: 20px; margin-bottom: 2rem; }
-    .agent-card { text-align: center; padding: 1rem; background: white; border-radius: 10px; margin: 0.5rem; }
+    .agent-card { text-align: center; padding: 1rem; background: white; border-radius: 10px; margin: 0.5rem; transition: transform 0.3s; }
+    .agent-card:hover { transform: translateY(-5px); }
 </style>
 """, unsafe_allow_html=True)
 
@@ -32,11 +33,12 @@ for col, (emoji, name, desc) in zip([col1, col2, col3, col4], agents):
 
 # Input
 topic = st.text_input("📝 Blog Topic", placeholder="e.g., The Future of Artificial Intelligence")
+
 col1, col2 = st.columns(2)
 with col1:
     word_count = st.select_slider("Target Length", options=[500, 800, 1000, 1200, 1500], value=800)
 with col2:
-    creativity = st.slider("Creativity Level", 0.0, 1.0, 0.7)
+    creativity = st.slider("Creativity Level", 0.0, 1.0, 0.7, 0.1)
 
 # Groq API key
 api_key = os.getenv("GROQ_API_KEY")
@@ -50,10 +52,9 @@ if not api_key:
 client = Groq(api_key=api_key)
 
 def call_groq(prompt):
-    """Call Groq API with retry logic"""
     try:
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",  # Free, high quality, fast
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             temperature=creativity,
             max_tokens=2000
@@ -103,7 +104,6 @@ if st.button("🚀 Generate Blog Post", type="primary", use_container_width=True
                             with open(filename, 'w', encoding='utf-8') as f:
                                 f.write(final)
                             
-                            # Download button
                             with open(filename, 'r', encoding='utf-8') as f:
                                 st.download_button(
                                     label="📥 Download Blog Post",
@@ -120,13 +120,13 @@ if st.button("🚀 Generate Blog Post", type="primary", use_container_width=True
             progress.empty()
             status.empty()
 
-# Sidebar with info
+# Sidebar info
 st.sidebar.markdown("---")
 st.sidebar.subheader("⚡ Groq Free Tier")
 st.sidebar.info("""
 - **30 requests/minute**
 - **1000+ requests/day**
-- **Extremely fast** (500+ tokens/sec)
+- **500+ tokens/second**
 - **100% free** (no credit card)
 """)
 
