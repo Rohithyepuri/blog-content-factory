@@ -761,3 +761,6 @@ Built with ❤️ using **Groq + CrewAI** | 4 Specialized AI Agents | MIT Licens
 
 ## Contributors
 - [Sandy5604G](https://github.com/Sandy5604G)
+
+## Contributors
+- [Sandy5604G](https://github.com/Sandy5604G)
